@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import CameraFeed from './components/CameraFeed'
 import EffectControls from './components/EffectControls'
 import FPSDisplay from './components/FPSDisplay'
+import CameraDiagnostics from './components/CameraDiagnostics'
 import './App.css'
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
           onFPSUpdate={setFps}
         />
         <EffectControls />
+        <CameraDiagnostics />
       </div>
     </div>
   )
