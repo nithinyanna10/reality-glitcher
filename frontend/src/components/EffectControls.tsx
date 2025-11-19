@@ -11,7 +11,11 @@ const EFFECTS = [
   { id: 'portal_ripple', name: 'Portal Ripple', gesture: 'mouth_open' },
 ]
 
-export default function EffectControls() {
+interface EffectControlsProps {
+  onEffectsChange: (effects: string[]) => void
+}
+
+export default function EffectControls({ onEffectsChange }: EffectControlsProps) {
   const [enabledEffects, setEnabledEffects] = useState<Set<string>>(new Set())
 
   const toggleEffect = (effectId: string) => {
@@ -22,6 +26,7 @@ export default function EffectControls() {
       newSet.add(effectId)
     }
     setEnabledEffects(newSet)
+    onEffectsChange(Array.from(newSet))
   }
 
   return (

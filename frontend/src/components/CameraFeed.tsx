@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { ShaderEngine } from '../engine/ShaderEngine'
 import { WebSocketManager } from '../utils/WebSocketManager'
+import { CanvasEffects } from '../utils/CanvasEffects'
 import './CameraFeed.css'
 
 interface CameraFeedProps {
   isActive: boolean
   onFPSUpdate: (fps: number) => void
+  activeEffects: string[]
 }
 
-export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
+export default function CameraFeed({ isActive, onFPSUpdate, activeEffects }: CameraFeedProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const shaderEngineRef = useRef<ShaderEngine | null>(null)
   const wsManagerRef = useRef<WebSocketManager | null>(null)
+  const canvasEffectsRef = useRef<CanvasEffects>(new CanvasEffects())
   const animationFrameRef = useRef<number>()
-  const [activeEffects, setActiveEffects] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const fpsRef = useRef({ lastTime: 0, frameCount: 0, fps: 0 })
@@ -92,35 +94,18 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
           console.log('Video element playing, readyState:', videoRef.current.readyState)
         }
 
-        // Try to initialize WebGPU shader engine
+        // Don't use WebGPU by default - use 2D canvas effects instead
+        // WebGPU is optional and only used if explicitly enabled
         let webgpuAvailable = false
+        // Skip WebGPU initialization - use 2D canvas effects
         if (canvasRef.current) {
-          try {
-            const engine = new ShaderEngine(canvasRef.current)
-            await engine.init()
-            shaderEngineRef.current = engine
-            webgpuAvailable = true
-            console.log('WebGPU initialized successfully')
-          } catch (webgpuError) {
-            console.warn('WebGPU not available, using fallback rendering:', webgpuError)
-            setError('WebGPU not available - using fallback mode. Enable WebGPU in chrome://flags for full effects.')
-            // Continue with fallback rendering - ensure canvas is ready
-            if (canvasRef.current) {
-              canvasRef.current.width = 1280
-              canvasRef.current.height = 720
-            }
-          }
+          canvasRef.current.width = 1280
+          canvasRef.current.height = 720
         }
 
         // Initialize WebSocket connection (optional, won't fail if unavailable)
         try {
           const wsManager = new WebSocketManager()
-          wsManager.onGestureEvent = (event) => {
-            setActiveEffects(event.active_effects || [])
-            if (shaderEngineRef.current) {
-              shaderEngineRef.current.setActiveEffects(event.active_effects || [])
-            }
-          }
           await wsManager.connect()
           wsManagerRef.current = wsManager
           console.log('WebSocket connected')
@@ -183,20 +168,8 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
           onFPSUpdate(fpsRef.current.fps)
         }
 
-        // Render frame
-        if (useWebGPU && shaderEngineRef.current) {
-          // Use WebGPU shader rendering
-          try {
-            shaderEngineRef.current.render(video)
-          } catch (e) {
-            console.error('WebGPU render error:', e)
-            // Fallback to 2D canvas
-            renderFallback(video, canvas)
-          }
-        } else {
-          // Fallback to 2D canvas rendering
-          renderFallback(video, canvas)
-        }
+        // Render frame with effects using 2D canvas
+        renderWithEffects(video, canvas)
 
         // Send frame to backend for gesture detection (throttled)
         if (wsManagerRef.current && fpsRef.current.frameCount % 5 === 0) {
@@ -227,7 +200,7 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
     render()
   }
 
-  const renderFallback = (video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
+  const renderWithEffects = (video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d')
     if (!ctx) {
       console.error('Failed to get 2D context')
@@ -244,10 +217,15 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
       console.log(`Canvas size set to: ${width}x${height}`)
     }
 
-    // Draw video frame
+    // Draw video frame with effects
     try {
       if (video.videoWidth > 0 && video.videoHeight > 0) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        // Apply first active effect, or just draw video if none
+        if (activeEffects.length > 0) {
+          canvasEffectsRef.current.applyEffect(ctx, activeEffects[0], video, canvas)
+        } else {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        }
       } else {
         // Video not ready, draw placeholder
         ctx.fillStyle = '#1a1a1a'
@@ -265,6 +243,10 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
       ctx.textAlign = 'center'
       ctx.fillText('Render error', canvas.width / 2, canvas.height / 2)
     }
+  }
+
+  const renderFallback = (video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
+    renderWithEffects(video, canvas)
   }
 
   const captureFrame = (video: HTMLVideoElement, canvas: HTMLCanvasElement): string | null => {

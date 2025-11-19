@@ -8,6 +8,7 @@ import './App.css'
 function App() {
   const [isActive, setIsActive] = useState(false)
   const [fps, setFps] = useState(0)
+  const [activeEffects, setActiveEffects] = useState<string[]>([])
 
   return (
     <div className="app">
@@ -28,8 +29,9 @@ function App() {
         <CameraFeed 
           isActive={isActive} 
           onFPSUpdate={setFps}
+          activeEffects={activeEffects}
         />
-        <EffectControls />
+        <EffectControls onEffectsChange={setActiveEffects} />
         <CameraDiagnostics />
       </div>
     </div>
