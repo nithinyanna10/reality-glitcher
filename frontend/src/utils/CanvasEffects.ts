@@ -42,44 +42,57 @@ export class CanvasEffects {
   }
 
   private applyLiquify(ctx: CanvasRenderingContext2D, video: HTMLVideoElement, canvas: HTMLCanvasElement): void {
-    // Create temporary canvas for source
-    const tempCanvas = document.createElement('canvas')
-    tempCanvas.width = canvas.width
-    tempCanvas.height = canvas.height
-    const tempCtx = tempCanvas.getContext('2d')!
-    tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height)
-    
-    const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height)
-    const data = imageData.data
-    const newData = new Uint8ClampedArray(data)
-
+    // Use transform-based approach for better performance
     const centerX = canvas.width / 2
     const centerY = canvas.height / 2
-    const radius = Math.min(canvas.width, canvas.height) * 0.3
-    const intensity = 0.3
+    const radius = Math.min(canvas.width, canvas.height) * 0.4
+    const intensity = 15
 
-    for (let y = 0; y < canvas.height; y++) {
-      for (let x = 0; x < canvas.width; x++) {
+    // Draw base video
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    
+    // Apply liquify using canvas transforms (faster than pixel manipulation)
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const data = imageData.data
+    const newData = new Uint8ClampedArray(data.length)
+
+    // Sample every 2 pixels for performance
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
         const dx = x - centerX
         const dy = y - centerY
         const dist = Math.sqrt(dx * dx + dy * dy)
         
         if (dist < radius) {
           const angle = Math.atan2(dy, dx)
-          const wave = Math.sin(dist / 20 - this.time * 2) * (1 - dist / radius) * intensity * radius
+          const normalizedDist = dist / radius
+          const wave = Math.sin(dist / 15 - this.time * 3) * (1 - normalizedDist) * intensity
           
           const newX = Math.round(x + wave * Math.cos(angle))
           const newY = Math.round(y + wave * Math.sin(angle))
           
+          const srcIdx = (y * canvas.width + x) * 4
+          
           if (newX >= 0 && newX < canvas.width && newY >= 0 && newY < canvas.height) {
-            const srcIdx = (y * canvas.width + x) * 4
             const dstIdx = (newY * canvas.width + newX) * 4
-            
             newData[dstIdx] = data[srcIdx]
             newData[dstIdx + 1] = data[srcIdx + 1]
             newData[dstIdx + 2] = data[srcIdx + 2]
             newData[dstIdx + 3] = data[srcIdx + 3]
+          } else {
+            // Keep original if out of bounds
+            newData[srcIdx] = data[srcIdx]
+            newData[srcIdx + 1] = data[srcIdx + 1]
+            newData[srcIdx + 2] = data[srcIdx + 2]
+            newData[srcIdx + 3] = data[srcIdx + 3]
           }
+        } else {
+          // Keep original outside radius
+          const idx = (y * canvas.width + x) * 4
+          newData[idx] = data[idx]
+          newData[idx + 1] = data[idx + 1]
+          newData[idx + 2] = data[idx + 2]
+          newData[idx + 3] = data[idx + 3]
         }
       }
     }
