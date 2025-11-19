@@ -192,9 +192,24 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
 
     // Draw video frame
     try {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      } else {
+        // Video not ready, draw placeholder
+        ctx.fillStyle = '#1a1a1a'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.fillStyle = '#00ff88'
+        ctx.font = '24px Arial'
+        ctx.textAlign = 'center'
+        ctx.fillText('Camera initializing...', canvas.width / 2, canvas.height / 2)
+      }
     } catch (e) {
       console.error('Error drawing video frame:', e)
+      // Draw error message
+      ctx.fillStyle = '#ff4444'
+      ctx.font = '20px Arial'
+      ctx.textAlign = 'center'
+      ctx.fillText('Render error', canvas.width / 2, canvas.height / 2)
     }
   }
 
@@ -232,7 +247,24 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
         }}
       />
       <canvas
-        ref={canvasRef}
+        ref={(el) => {
+          canvasRef.current = el
+          if (el) {
+            // Set initial canvas size
+            el.width = 1280
+            el.height = 720
+            // Draw a test pattern to verify canvas is working
+            const ctx = el.getContext('2d')
+            if (ctx) {
+              ctx.fillStyle = '#1a1a1a'
+              ctx.fillRect(0, 0, el.width, el.height)
+              ctx.fillStyle = '#00ff88'
+              ctx.font = '24px Arial'
+              ctx.textAlign = 'center'
+              ctx.fillText('Waiting for camera...', el.width / 2, el.height / 2)
+            }
+          }
+        }}
         className="camera-canvas"
         style={{ 
           width: '100%', 
