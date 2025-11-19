@@ -77,7 +77,11 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
           } catch (webgpuError) {
             console.warn('WebGPU not available, using fallback rendering:', webgpuError)
             setError('WebGPU not available - using fallback mode. Enable WebGPU in chrome://flags for full effects.')
-            // Continue with fallback rendering
+            // Continue with fallback rendering - ensure canvas is ready
+            if (canvasRef.current) {
+              canvasRef.current.width = 1280
+              canvasRef.current.height = 720
+            }
           }
         }
 
