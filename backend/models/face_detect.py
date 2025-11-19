@@ -4,14 +4,25 @@ Detects facial landmarks for gesture recognition
 """
 
 import cv2
-import mediapipe as mp
 import numpy as np
 from typing import List, Tuple, Optional
+
+try:
+    import mediapipe as mp
+    MEDIAPIPE_AVAILABLE = True
+except ImportError:
+    MEDIAPIPE_AVAILABLE = False
+    print("Warning: MediaPipe not available. Install with: pip install mediapipe (requires Python 3.8-3.11)")
 
 class FaceDetector:
     """MediaPipe-based face detection and landmark extraction"""
     
     def __init__(self):
+        if not MEDIAPIPE_AVAILABLE:
+            self.face_mesh = None
+            self.mp_drawing = None
+            return
+        
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(
             static_image_mode=False,
@@ -35,6 +46,9 @@ class FaceDetector:
     
     def detect(self, frame: np.ndarray) -> Optional[List]:
         """Detect face landmarks in frame"""
+        if not MEDIAPIPE_AVAILABLE or self.face_mesh is None:
+            return None
+        
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.face_mesh.process(rgb_frame)
         

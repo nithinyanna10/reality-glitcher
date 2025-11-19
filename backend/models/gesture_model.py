@@ -4,16 +4,27 @@ Detects: blink, smile, hand raise, mouth open, head tilt, eyebrow raise
 """
 
 import cv2
-import mediapipe as mp
 import numpy as np
 from typing import Dict, Optional
-from .face_detect import FaceDetector
+from .face_detect import FaceDetector, MEDIAPIPE_AVAILABLE
+
+try:
+    import mediapipe as mp
+except ImportError:
+    mp = None
 
 class GestureDetector:
     """Main gesture detection class using MediaPipe"""
     
     def __init__(self):
         self.face_detector = FaceDetector()
+        
+        if not MEDIAPIPE_AVAILABLE or mp is None:
+            self.hands = None
+            self.pose = None
+            self.mp_hands = None
+            self.mp_pose = None
+            return
         
         # Hand detection
         self.mp_hands = mp.solutions.hands
@@ -116,6 +127,9 @@ class GestureDetector:
     
     def _detect_hand_gestures(self, frame) -> Dict[str, bool]:
         """Detect hand-based gestures"""
+        if self.hands is None:
+            return {'raise_hand': False, 'both_hands_up': False}
+        
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.hands.process(rgb_frame)
         
@@ -143,6 +157,9 @@ class GestureDetector:
     
     def _detect_head_tilt(self, frame) -> Dict[str, bool]:
         """Detect head tilt using pose estimation"""
+        if self.pose is None:
+            return {'head_tilt': False}
+        
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.pose.process(rgb_frame)
         
