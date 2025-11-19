@@ -1,0 +1,12 @@
+{
+  "gesture_mappings": {
+    "blink": ["flipGravity"],
+    "smile": ["liquify"],
+    "raise_hand": ["matrix"],
+    "head_tilt": ["vhs"],
+    "both_hands_up": ["slow_motion"],
+    "mouth_open": ["portal_ripple"],
+    "eyebrow_raise": ["pixel_sort"]
+  }
+}
+

@@ -1,0 +1,26 @@
+pipelines:
+  - name: "liquify_pipeline"
+    effects:
+      - liquify
+      - vhs
+    intensity: 0.7
+  
+  - name: "glitch_pipeline"
+    effects:
+      - pixel_sort
+      - glitch
+      - vhs
+    intensity: 0.8
+  
+  - name: "matrix_pipeline"
+    effects:
+      - matrix
+      - vhs
+    intensity: 0.6
+  
+  - name: "portal_pipeline"
+    effects:
+      - portal_ripple
+      - liquify
+    intensity: 0.5
+

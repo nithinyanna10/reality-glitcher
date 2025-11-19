@@ -1,0 +1,53 @@
+{
+  "effects": {
+    "liquify": {
+      "name": "Liquify",
+      "description": "Liquified world shader with mesh deformation",
+      "intensity": 0.5,
+      "shader": "liquify.wgsl"
+    },
+    "vhs": {
+      "name": "VHS Distortion",
+      "description": "VHS + CRT distortion with scanlines",
+      "intensity": 0.5,
+      "shader": "vhs.wgsl"
+    },
+    "pixel_sort": {
+      "name": "Pixel Sort",
+      "description": "Pixel sorting glitch effect",
+      "intensity": 0.5,
+      "shader": "pixel_sort.wgsl"
+    },
+    "glitch": {
+      "name": "Glitch",
+      "description": "Fractal glitch overlays",
+      "intensity": 0.5,
+      "shader": "glitch.wgsl"
+    },
+    "matrix": {
+      "name": "Matrix Rain",
+      "description": "Matrix-style falling code",
+      "intensity": 0.5,
+      "shader": "matrix.wgsl"
+    },
+    "flipGravity": {
+      "name": "Gravity Flip",
+      "description": "World gravity flips upside down",
+      "intensity": 0.5,
+      "shader": "gravity.wgsl"
+    },
+    "slow_motion": {
+      "name": "Slow Motion",
+      "description": "Slow motion shader with motion blur",
+      "intensity": 0.5,
+      "shader": "slow_motion.wgsl"
+    },
+    "portal_ripple": {
+      "name": "Portal Ripple",
+      "description": "Portal ripple effect",
+      "intensity": 0.5,
+      "shader": "portal.wgsl"
+    }
+  }
+}
+

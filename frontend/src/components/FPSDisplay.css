@@ -1,0 +1,17 @@
+.fps-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.fps-label {
+  color: #888;
+}
+
+.fps-value {
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  min-width: 3ch;
+}
+
