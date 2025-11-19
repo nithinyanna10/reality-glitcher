@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ShaderEngine } from '../engine/ShaderEngine'
 import { WebSocketManager } from '../utils/WebSocketManager'
 import { CanvasEffects } from '../utils/CanvasEffects'
+import { TensorFlowGestureDetector } from '../utils/TensorFlowGestureDetector'
 import './CameraFeed.css'
 
 interface CameraFeedProps {
@@ -16,10 +17,13 @@ export default function CameraFeed({ isActive, onFPSUpdate, activeEffects }: Cam
   const shaderEngineRef = useRef<ShaderEngine | null>(null)
   const wsManagerRef = useRef<WebSocketManager | null>(null)
   const canvasEffectsRef = useRef<CanvasEffects>(new CanvasEffects())
+  const gestureDetectorRef = useRef<TensorFlowGestureDetector | null>(null)
   const animationFrameRef = useRef<number>()
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [detectedGestures, setDetectedGestures] = useState<string[]>([])
   const fpsRef = useRef({ lastTime: 0, frameCount: 0, fps: 0 })
+  const gestureCheckCounter = useRef(0)
 
   // Initialize canvas immediately
   useEffect(() => {
@@ -103,6 +107,20 @@ export default function CameraFeed({ isActive, onFPSUpdate, activeEffects }: Cam
           canvasRef.current.height = 720
         }
 
+        // Initialize TensorFlow.js gesture detector
+        try {
+          const detector = new TensorFlowGestureDetector()
+          const initialized = await detector.init()
+          if (initialized) {
+            gestureDetectorRef.current = detector
+            console.log('TensorFlow.js gesture detector ready')
+          } else {
+            console.warn('Gesture detector not available - effects can be triggered manually')
+          }
+        } catch (error) {
+          console.warn('Failed to initialize gesture detector:', error)
+        }
+
         // Initialize WebSocket connection (optional, won't fail if unavailable)
         try {
           const wsManager = new WebSocketManager()
@@ -171,11 +189,45 @@ export default function CameraFeed({ isActive, onFPSUpdate, activeEffects }: Cam
         // Render frame with effects using 2D canvas
         renderWithEffects(video, canvas)
 
-        // Send frame to backend for gesture detection (throttled)
-        if (wsManagerRef.current && fpsRef.current.frameCount % 5 === 0) {
-          const imageData = captureFrame(video, canvas)
-          if (imageData) {
-            wsManagerRef.current.sendFrame(imageData)
+        // Detect gestures using TensorFlow.js (throttled - every 10 frames)
+        gestureCheckCounter.current++
+        if (gestureDetectorRef.current && gestureCheckCounter.current % 10 === 0) {
+          try {
+            const gestures = await gestureDetectorRef.current.detect(video)
+            const activeGestures: string[] = []
+            
+            if (gestures.blink) activeGestures.push('blink')
+            if (gestures.smile) activeGestures.push('smile')
+            if (gestures.raise_hand) activeGestures.push('raise_hand')
+            if (gestures.both_hands_up) activeGestures.push('both_hands_up')
+            if (gestures.head_tilt) activeGestures.push('head_tilt')
+            if (gestures.mouth_open) activeGestures.push('mouth_open')
+            if (gestures.eyebrow_raise) activeGestures.push('eyebrow_raise')
+            
+            setDetectedGestures(activeGestures)
+            
+            // Map gestures to effects and apply
+            const gestureToEffect: Record<string, string> = {
+              'blink': 'flipGravity',
+              'smile': 'liquify',
+              'raise_hand': 'matrix',
+              'both_hands_up': 'slow_motion',
+              'head_tilt': 'vhs',
+              'mouth_open': 'portal_ripple',
+              'eyebrow_raise': 'pixel_sort'
+            }
+            
+            const effectsFromGestures = activeGestures
+              .map(g => gestureToEffect[g])
+              .filter(e => e !== undefined)
+            
+            // Update active effects if gestures detected
+            if (effectsFromGestures.length > 0 && activeEffects.length === 0) {
+              // Auto-apply effect from gesture (you can disable this if you prefer manual control)
+              // onEffectsChange?.(effectsFromGestures)
+            }
+          } catch (error) {
+            console.error('Gesture detection error:', error)
           }
         }
       } else if (video) {
@@ -298,8 +350,23 @@ export default function CameraFeed({ isActive, onFPSUpdate, activeEffects }: Cam
       )}
       {activeEffects.length > 0 && (
         <div className="active-effects">
+          <div style={{ marginBottom: '0.5rem', fontSize: '0.7rem', color: '#888' }}>
+            Active Effects:
+          </div>
           {activeEffects.map(effect => (
             <span key={effect} className="effect-badge">{effect}</span>
+          ))}
+        </div>
+      )}
+      {detectedGestures.length > 0 && (
+        <div className="active-effects" style={{ top: 'auto', bottom: '1rem' }}>
+          <div style={{ marginBottom: '0.5rem', fontSize: '0.7rem', color: '#00ccff' }}>
+            Detected Gestures:
+          </div>
+          {detectedGestures.map(gesture => (
+            <span key={gesture} className="effect-badge" style={{ borderColor: '#00ccff', color: '#00ccff' }}>
+              {gesture}
+            </span>
           ))}
         </div>
       )}
