@@ -192,43 +192,45 @@ export default function CameraFeed({ isActive, onFPSUpdate, activeEffects }: Cam
         // Detect gestures using TensorFlow.js (throttled - every 10 frames)
         gestureCheckCounter.current++
         if (gestureDetectorRef.current && gestureCheckCounter.current % 10 === 0) {
-          try {
-            const gestures = await gestureDetectorRef.current.detect(video)
-            const activeGestures: string[] = []
-            
-            if (gestures.blink) activeGestures.push('blink')
-            if (gestures.smile) activeGestures.push('smile')
-            if (gestures.raise_hand) activeGestures.push('raise_hand')
-            if (gestures.both_hands_up) activeGestures.push('both_hands_up')
-            if (gestures.head_tilt) activeGestures.push('head_tilt')
-            if (gestures.mouth_open) activeGestures.push('mouth_open')
-            if (gestures.eyebrow_raise) activeGestures.push('eyebrow_raise')
-            
-            setDetectedGestures(activeGestures)
-            
-            // Map gestures to effects and apply
-            const gestureToEffect: Record<string, string> = {
-              'blink': 'flipGravity',
-              'smile': 'liquify',
-              'raise_hand': 'matrix',
-              'both_hands_up': 'slow_motion',
-              'head_tilt': 'vhs',
-              'mouth_open': 'portal_ripple',
-              'eyebrow_raise': 'pixel_sort'
-            }
-            
-            const effectsFromGestures = activeGestures
-              .map(g => gestureToEffect[g])
-              .filter(e => e !== undefined)
-            
-            // Update active effects if gestures detected
-            if (effectsFromGestures.length > 0 && activeEffects.length === 0) {
-              // Auto-apply effect from gesture (you can disable this if you prefer manual control)
-              // onEffectsChange?.(effectsFromGestures)
-            }
-          } catch (error) {
-            console.error('Gesture detection error:', error)
-          }
+          // Use .then() instead of await since render is not async
+          gestureDetectorRef.current.detect(video)
+            .then(gestures => {
+              const activeGestures: string[] = []
+              
+              if (gestures.blink) activeGestures.push('blink')
+              if (gestures.smile) activeGestures.push('smile')
+              if (gestures.raise_hand) activeGestures.push('raise_hand')
+              if (gestures.both_hands_up) activeGestures.push('both_hands_up')
+              if (gestures.head_tilt) activeGestures.push('head_tilt')
+              if (gestures.mouth_open) activeGestures.push('mouth_open')
+              if (gestures.eyebrow_raise) activeGestures.push('eyebrow_raise')
+              
+              setDetectedGestures(activeGestures)
+              
+              // Map gestures to effects and apply
+              const gestureToEffect: Record<string, string> = {
+                'blink': 'flipGravity',
+                'smile': 'liquify',
+                'raise_hand': 'matrix',
+                'both_hands_up': 'slow_motion',
+                'head_tilt': 'vhs',
+                'mouth_open': 'portal_ripple',
+                'eyebrow_raise': 'pixel_sort'
+              }
+              
+              const effectsFromGestures = activeGestures
+                .map(g => gestureToEffect[g])
+                .filter(e => e !== undefined)
+              
+              // Update active effects if gestures detected
+              if (effectsFromGestures.length > 0 && activeEffects.length === 0) {
+                // Auto-apply effect from gesture (you can disable this if you prefer manual control)
+                // onEffectsChange?.(effectsFromGestures)
+              }
+            })
+            .catch(error => {
+              console.error('Gesture detection error:', error)
+            })
         }
       } else if (video) {
         // Video exists but not ready - show placeholder
