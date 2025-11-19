@@ -11,8 +11,14 @@ import asyncio
 import json
 import logging
 
-from models.face_detect import FaceDetector
-from models.gesture_model import GestureDetector
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from backend.models.face_detect import FaceDetector
+from backend.models.gesture_model import GestureDetector
 from engine.core import EffectEngine
 from engine.registry import EffectRegistry
 
