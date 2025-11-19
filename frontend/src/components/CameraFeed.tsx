@@ -18,7 +18,23 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const fpsRef = useRef({ lastTime: 0, frameCount: 0, fps: 0 })
-  const fallbackCanvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  // Initialize canvas immediately
+  useEffect(() => {
+    if (canvasRef.current) {
+      canvasRef.current.width = 1280
+      canvasRef.current.height = 720
+      const ctx = canvasRef.current.getContext('2d')
+      if (ctx) {
+        ctx.fillStyle = '#1a1a1a'
+        ctx.fillRect(0, 0, 1280, 720)
+        ctx.fillStyle = '#00ff88'
+        ctx.font = '32px Arial'
+        ctx.textAlign = 'center'
+        ctx.fillText('Click Start to begin', 640, 360)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!isActive) {
@@ -28,6 +44,18 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
       }
       if (wsManagerRef.current) {
         wsManagerRef.current.disconnect()
+      }
+      // Show placeholder when stopped
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d')
+        if (ctx) {
+          ctx.fillStyle = '#1a1a1a'
+          ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+          ctx.fillStyle = '#00ff88'
+          ctx.font = '32px Arial'
+          ctx.textAlign = 'center'
+          ctx.fillText('Click Start to begin', canvasRef.current.width / 2, canvasRef.current.height / 2)
+        }
       }
       return
     }
@@ -54,10 +82,9 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
           videoRef.current.srcObject = stream
           videoRef.current.onloadedmetadata = () => {
             console.log(`Video metadata loaded: ${videoRef.current?.videoWidth}x${videoRef.current?.videoHeight}`)
-            if (canvasRef.current) {
-              // Set canvas size immediately
-              canvasRef.current.width = videoRef.current?.videoWidth || 1280
-              canvasRef.current.height = videoRef.current?.videoHeight || 720
+            if (canvasRef.current && videoRef.current) {
+              canvasRef.current.width = videoRef.current.videoWidth || 1280
+              canvasRef.current.height = videoRef.current.videoHeight || 720
               console.log(`Canvas initialized: ${canvasRef.current.width}x${canvasRef.current.height}`)
             }
           }
@@ -109,6 +136,18 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
         console.error('Error initializing camera:', error)
         setError(`Camera error: ${error.message || 'Failed to access camera. Check permissions.'}`)
         setIsLoading(false)
+        // Show error on canvas
+        if (canvasRef.current) {
+          const ctx = canvasRef.current.getContext('2d')
+          if (ctx) {
+            ctx.fillStyle = '#1a1a1a'
+            ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+            ctx.fillStyle = '#ff4444'
+            ctx.font = '24px Arial'
+            ctx.textAlign = 'center'
+            ctx.fillText('Camera Error: ' + (error.message || 'Check permissions'), canvasRef.current.width / 2, canvasRef.current.height / 2)
+          }
+        }
       }
     }
 
@@ -122,17 +161,18 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
   }, [isActive])
 
   const startRenderLoop = (useWebGPU: boolean = true) => {
+    console.log('Starting render loop, useWebGPU:', useWebGPU)
     const render = () => {
-      if (!videoRef.current || !canvasRef.current) {
+      if (!canvasRef.current) {
         animationFrameRef.current = requestAnimationFrame(render)
         return
       }
 
-      const video = videoRef.current
       const canvas = canvasRef.current
+      const video = videoRef.current
 
-      // Always render, even if video isn't ready yet (shows black screen)
-      if (video.readyState >= video.HAVE_CURRENT_DATA) {
+      // Always render something
+      if (video && video.readyState >= video.HAVE_CURRENT_DATA && video.videoWidth > 0) {
         // Update FPS
         const now = performance.now()
         fpsRef.current.frameCount++
@@ -157,10 +197,6 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
           // Fallback to 2D canvas rendering
           renderFallback(video, canvas)
         }
-      } else {
-        // Video not ready yet, but keep rendering loop going
-        console.log('Video not ready, readyState:', video.readyState)
-      }
 
         // Send frame to backend for gesture detection (throttled)
         if (wsManagerRef.current && fpsRef.current.frameCount % 5 === 0) {
@@ -168,6 +204,20 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
           if (imageData) {
             wsManagerRef.current.sendFrame(imageData)
           }
+        }
+      } else if (video) {
+        // Video exists but not ready - show placeholder
+        renderFallback(video, canvas)
+      } else {
+        // No video yet - show waiting message
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.fillStyle = '#1a1a1a'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+          ctx.fillStyle = '#00ff88'
+          ctx.font = '24px Arial'
+          ctx.textAlign = 'center'
+          ctx.fillText('Waiting for camera...', canvas.width / 2, canvas.height / 2)
         }
       }
 
@@ -242,33 +292,9 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
         playsInline
         muted
         style={{ display: 'none' }}
-        onLoadedMetadata={() => {
-          console.log('Video metadata loaded')
-          if (videoRef.current && canvasRef.current) {
-            canvasRef.current.width = videoRef.current.videoWidth || 1280
-            canvasRef.current.height = videoRef.current.videoHeight || 720
-          }
-        }}
       />
       <canvas
-        ref={(el) => {
-          canvasRef.current = el
-          if (el) {
-            // Set initial canvas size
-            el.width = 1280
-            el.height = 720
-            // Draw a test pattern to verify canvas is working
-            const ctx = el.getContext('2d')
-            if (ctx) {
-              ctx.fillStyle = '#1a1a1a'
-              ctx.fillRect(0, 0, el.width, el.height)
-              ctx.fillStyle = '#00ff88'
-              ctx.font = '24px Arial'
-              ctx.textAlign = 'center'
-              ctx.fillText('Waiting for camera...', el.width / 2, el.height / 2)
-            }
-          }
-        }}
+        ref={canvasRef}
         className="camera-canvas"
         style={{ 
           width: '100%', 
@@ -298,4 +324,3 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
     </div>
   )
 }
-
