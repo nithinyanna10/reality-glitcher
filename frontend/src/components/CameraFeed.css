@@ -17,6 +17,8 @@
   height: 100%;
   object-fit: contain;
   image-rendering: auto;
+  background: #000;
+  display: block;
 }
 
 .active-effects {

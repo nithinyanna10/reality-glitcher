@@ -52,8 +52,17 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream
+          videoRef.current.onloadedmetadata = () => {
+            console.log(`Video metadata loaded: ${videoRef.current?.videoWidth}x${videoRef.current?.videoHeight}`)
+            if (canvasRef.current) {
+              // Set canvas size immediately
+              canvasRef.current.width = videoRef.current?.videoWidth || 1280
+              canvasRef.current.height = videoRef.current?.videoHeight || 720
+              console.log(`Canvas initialized: ${canvasRef.current.width}x${canvasRef.current.height}`)
+            }
+          }
           await videoRef.current.play()
-          console.log('Video element playing')
+          console.log('Video element playing, readyState:', videoRef.current.readyState)
         }
 
         // Try to initialize WebGPU shader engine
@@ -118,7 +127,8 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
       const video = videoRef.current
       const canvas = canvasRef.current
 
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      // Always render, even if video isn't ready yet (shows black screen)
+      if (video.readyState >= video.HAVE_CURRENT_DATA) {
         // Update FPS
         const now = performance.now()
         fpsRef.current.frameCount++
@@ -143,6 +153,10 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
           // Fallback to 2D canvas rendering
           renderFallback(video, canvas)
         }
+      } else {
+        // Video not ready yet, but keep rendering loop going
+        console.log('Video not ready, readyState:', video.readyState)
+      }
 
         // Send frame to backend for gesture detection (throttled)
         if (wsManagerRef.current && fpsRef.current.frameCount % 5 === 0) {
@@ -161,16 +175,27 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
 
   const renderFallback = (video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    if (!ctx) {
+      console.error('Failed to get 2D context')
+      return
+    }
 
-    // Set canvas size to match video
-    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-      canvas.width = video.videoWidth || 1280
-      canvas.height = video.videoHeight || 720
+    // Set canvas size to match video or use default
+    const width = video.videoWidth || 1280
+    const height = video.videoHeight || 720
+    
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width
+      canvas.height = height
+      console.log(`Canvas size set to: ${width}x${height}`)
     }
 
     // Draw video frame
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    try {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    } catch (e) {
+      console.error('Error drawing video frame:', e)
+    }
   }
 
   const captureFrame = (video: HTMLVideoElement, canvas: HTMLCanvasElement): string | null => {
@@ -198,10 +223,23 @@ export default function CameraFeed({ isActive, onFPSUpdate }: CameraFeedProps) {
         playsInline
         muted
         style={{ display: 'none' }}
+        onLoadedMetadata={() => {
+          console.log('Video metadata loaded')
+          if (videoRef.current && canvasRef.current) {
+            canvasRef.current.width = videoRef.current.videoWidth || 1280
+            canvasRef.current.height = videoRef.current.videoHeight || 720
+          }
+        }}
       />
       <canvas
         ref={canvasRef}
         className="camera-canvas"
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          display: 'block',
+          background: '#000'
+        }}
       />
       {isLoading && (
         <div className="loading-overlay">
