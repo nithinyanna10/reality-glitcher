@@ -3,7 +3,6 @@
  * Uses face landmarks to detect gestures
  */
 
-import * as tf from '@tensorflow/tfjs'
 import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection'
 
 export interface GestureResult {
@@ -33,7 +32,7 @@ export class TensorFlowGestureDetector {
           runtime: 'mediapipe',
           solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
           refineLandmarks: true,
-        }
+        } as any
       )
       
       this.isInitialized = true
@@ -54,14 +53,15 @@ export class TensorFlowGestureDetector {
       const faces = await this.model.estimateFaces(video, {
         flipHorizontal: false,
         staticImageMode: false,
-      })
+      } as any)
 
       if (faces.length === 0) {
         return this.getEmptyGestures()
       }
 
       const face = faces[0]
-      const keypoints = face.keypoints
+      // Handle different API versions - keypoints might be in different format
+      const keypoints = (face as any).keypoints || (face as any).landmarks || []
 
       // Detect gestures from keypoints
       const gestures: GestureResult = {
@@ -108,12 +108,23 @@ export class TensorFlowGestureDetector {
   }
 
   private calculateEAR(keypoints: any[], indices: number[]): number {
-    if (indices.length < 6) return 0.3
+    if (indices.length < 6 || !keypoints || keypoints.length === 0) return 0.3
 
-    // Get eye landmark coordinates
-    const points = indices.slice(0, 6).map(idx => {
-      const kp = keypoints.find(k => k.name === idx.toString())
-      return kp ? { x: kp.x, y: kp.y } : null
+    // Get eye landmark coordinates - handle different keypoint formats
+    const points = indices.slice(0, 6).map((idx, i) => {
+      // Try different ways to access keypoints
+      let kp = null
+      if (Array.isArray(keypoints)) {
+        kp = keypoints[idx] || keypoints.find((k: any) => k.name === idx.toString() || k.name === idx)
+      }
+      
+      if (kp) {
+        return { 
+          x: kp.x !== undefined ? kp.x : (kp as any)[0], 
+          y: kp.y !== undefined ? kp.y : (kp as any)[1] 
+        }
+      }
+      return null
     }).filter(p => p !== null) as { x: number; y: number }[]
 
     if (points.length < 6) return 0.3
@@ -128,12 +139,30 @@ export class TensorFlowGestureDetector {
     return (vertical1 + vertical2) / (2.0 * horizontal)
   }
 
+  private getKeypoint(keypoints: any[], index: number): { x: number; y: number } | null {
+    if (!keypoints || keypoints.length === 0) return null
+    
+    // Try different ways to access keypoints
+    let kp = null
+    if (Array.isArray(keypoints)) {
+      kp = keypoints[index] || keypoints.find((k: any) => k.name === index.toString() || k.name === index)
+    }
+    
+    if (kp) {
+      return {
+        x: kp.x !== undefined ? kp.x : (kp as any)[0],
+        y: kp.y !== undefined ? kp.y : (kp as any)[1]
+      }
+    }
+    return null
+  }
+
   private detectSmile(keypoints: any[]): boolean {
-    // Mouth corner points
-    const leftCorner = keypoints.find(k => k.name === '61')
-    const rightCorner = keypoints.find(k => k.name === '291')
-    const upperLip = keypoints.find(k => k.name === '13')
-    const lowerLip = keypoints.find(k => k.name === '14')
+    // Mouth corner points (MediaPipe indices)
+    const leftCorner = this.getKeypoint(keypoints, 61)
+    const rightCorner = this.getKeypoint(keypoints, 291)
+    const upperLip = this.getKeypoint(keypoints, 13)
+    const lowerLip = this.getKeypoint(keypoints, 14)
 
     if (!leftCorner || !rightCorner || !upperLip || !lowerLip) {
       return false
@@ -147,8 +176,8 @@ export class TensorFlowGestureDetector {
   }
 
   private detectMouthOpen(keypoints: any[]): boolean {
-    const upperLip = keypoints.find(k => k.name === '13')
-    const lowerLip = keypoints.find(k => k.name === '14')
+    const upperLip = this.getKeypoint(keypoints, 13)
+    const lowerLip = this.getKeypoint(keypoints, 14)
 
     if (!upperLip || !lowerLip) {
       return false
@@ -159,9 +188,9 @@ export class TensorFlowGestureDetector {
   }
 
   private detectHeadTilt(keypoints: any[]): boolean {
-    const nose = keypoints.find(k => k.name === '1')
-    const leftEye = keypoints.find(k => k.name === '33')
-    const rightEye = keypoints.find(k => k.name === '362')
+    const nose = this.getKeypoint(keypoints, 1)
+    const leftEye = this.getKeypoint(keypoints, 33)
+    const rightEye = this.getKeypoint(keypoints, 362)
 
     if (!nose || !leftEye || !rightEye) {
       return false
@@ -175,10 +204,10 @@ export class TensorFlowGestureDetector {
   }
 
   private detectEyebrowRaise(keypoints: any[]): boolean {
-    const leftEyebrow = keypoints.find(k => k.name === '107')
-    const rightEyebrow = keypoints.find(k => k.name === '336')
-    const leftEye = keypoints.find(k => k.name === '33')
-    const rightEye = keypoints.find(k => k.name === '362')
+    const leftEyebrow = this.getKeypoint(keypoints, 107)
+    const rightEyebrow = this.getKeypoint(keypoints, 336)
+    const leftEye = this.getKeypoint(keypoints, 33)
+    const rightEye = this.getKeypoint(keypoints, 362)
 
     if (!leftEyebrow || !rightEyebrow || !leftEye || !rightEye) {
       return false
