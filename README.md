@@ -202,5 +202,4 @@ Built with:
 
 ---
 
-**Made with ❤️ and way too much time**
 
